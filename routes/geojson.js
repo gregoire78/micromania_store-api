@@ -1,0 +1,84 @@
+const cheerio = require('cheerio')
+const axios = require('axios')
+const {
+    promisify
+} = require('util')
+const fs = require('fs')
+const writeFile = promisify(fs.writeFile)
+const readFile = promisify(fs.readFile)
+
+// eslint-disable-next-line no-unused-vars
+async function getGeoJson() {
+    try {
+        const storesPage = await axios.get('https://www.micromania.fr/liste-magasins-micromania.html')
+        const $ = cheerio.load(storesPage.data)
+        let stores = []
+        $('body .page .main .full-list').find('a').map((index, element) => {
+            stores.push($(element).attr('href'))
+        })
+        let result = []
+        let geojsonFeatures = []
+        const map = new Map()
+        for (let v in stores) {
+            console.log(stores[v])
+            const store = await axios.get(stores[v])
+            const $ = cheerio.load(store.data)
+            // const address = $('li.address').text().trim().replace(/\s+\n\s+/g, '\n')
+            const stringDataStores = $('body .page .main .col-main').find('script').html().match(/\[.*\]/gm)
+            if (stringDataStores) {
+                try {
+                    const parsingStores = JSON.parse(stringDataStores[0].replace(/\\'/g, "'"))
+                    parsingStores.map(parsingStore => {
+                        if (parsingStore) {
+                            const obj = {
+                                id: parsingStore[3],
+                                description: parsingStore[0],
+                                link: parsingStore[0].match(/href="([^"]*)/)[1],
+                                lat: parsingStore[1],
+                                lon: parsingStore[2]
+                            }
+                            const geojsonObj = {
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'Point',
+                                    coordinates: [parsingStore[2], parsingStore[1]]
+                                },
+                                properties: {
+                                    'id': parsingStore[3],
+                                    'description': parsingStore[0],
+                                    'link': parsingStore[0].match(/href="([^"]*)/)[1],
+                                    'lat': parsingStore[1],
+                                    'lon': parsingStore[2],
+                                    'marker-color': '#004080',
+                                    'marker-size': 'medium',
+                                    'marker-symbol': 'shop'
+                                }
+                            }
+                            if (!map.has(obj.id)) {
+                                map.set(obj.id, true)
+                                result.push(obj)
+                                geojsonFeatures.push(geojsonObj)
+                                console.log('+1')
+                            }
+                        }
+                    })
+                } catch (e) {
+                    console.log(stringDataStores[0], e)
+                }
+            }
+        }
+        await writeFile('../store.json', JSON.stringify(result))
+        await writeFile('../store.geojson', JSON.stringify({
+            type: 'FeatureCollection',
+            features: geojsonFeatures
+        }))
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+module.exports = async (router) => {
+    router.get('/geojson', async (ctx) => {
+        ctx.ok(JSON.parse(await readFile('./store.geojson')))
+    })
+}
