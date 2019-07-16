@@ -12,7 +12,7 @@ const router = new Router()
 // security
 app.use(helmet())
 app.use(cors({
-    origin: 'localhost',
+    origin: '*',
     allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
     exposeHeaders: ['X-Request-Id']
 }))
