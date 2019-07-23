@@ -12,8 +12,6 @@ POST /v1/store
 curl -X POST \
   http://localhost:3000/v1/store \
   -H 'Content-Type: application/json' \
-  -H 'Postman-Token: 8609c4f2-59ce-46f1-bd6e-0af9e717d2ef' \
-  -H 'cache-control: no-cache' \
   -d '{
 	"url": "https://www.micromania.fr/magasin/127/flins-sur-seine.html"
 }'
